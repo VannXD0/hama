@@ -4,18 +4,23 @@
 ==================================================== */
 
 // ── SUPABASE (DUAL ARCHITECTURE) ───────────────────
-const { createClient } = supabase;
+const createClient = (typeof supabase !== 'undefined' && supabase.createClient) ? supabase.createClient : null;
 
 // 1. Auth Database (Users, login, tokens, device binding)
-const AUTH_DB_URL = "https://ljjzgddqbwpervtablgj.supabase.co";
-const AUTH_DB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqanpnZGRxYndwZXJ2dGFibGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NTY0NzgsImV4cCI6MjEwNTEzMjQ3OH0.4FDByk8iEv3RWpx6t2dj7sgLn3DUqL3HQh-tvX0LPss";
-const DB_AUTH = createClient(AUTH_DB_URL, AUTH_DB_KEY);
+const AUTH_DB_URL = "https://wleslngeddeshlbgwayn.supabase.co";
+const AUTH_DB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndsZXNsbmdlZGRlc2hsYmd3YXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjA4MjIsImV4cCI6MjEwNTEzNjgyMn0.9p_9WY6ZO73yVhMO4JF0FQVgdkDw2U7pZAKW0Ugy5B4";
+const DB_AUTH = createClient ? createClient(AUTH_DB_URL, AUTH_DB_KEY) : null;
 
 // 2. License Generator Database (Module licenses, App accounts, Inventory)
 const GEN_DB_URL = "https://wleslngeddeshlbgwayn.supabase.co";
 const GEN_DB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndsZXNsbmdlZGRlc2hsYmd3YXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjA4MjIsImV4cCI6MjEwNTEzNjgyMn0.9p_9WY6ZO73yVhMO4JF0FQVgdkDw2U7pZAKW0Ugy5B4";
-const DB = createClient(GEN_DB_URL, GEN_DB_KEY); // Default DB used for all license/account operations
+const DB = createClient ? createClient(GEN_DB_URL, GEN_DB_KEY) : null; // Default DB used for all license/account operations
 const db = DB;
+
+// 3. Crack License Database (1-Device HWID verification & management)
+const CRACK_DB_URL = "https://nvsubfeqxfhwrsjuijhy.supabase.co";
+const CRACK_DB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im52c3ViZmVxeGZod3JzanVpamh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNjg0NzUsImV4cCI6MjEwNjk0NDQ3NX0.kkNJHhMYk2s5Nfonj3EOMixi7XQ4VU_U0zekhCkHBlk";
+const DB_CRACK = createClient ? createClient(CRACK_DB_URL, CRACK_DB_KEY) : null;
 
 // ── SESSION ───────────────────────────────────────
 let SESSION = JSON.parse(localStorage.getItem('sa_session') || 'null');
@@ -77,6 +82,7 @@ function updateTokenUI(){
   const drawerTVal = document.getElementById('drawerTokenVal');
   const warnMod    = document.getElementById('tokenWarnMod');
   const warnApp    = document.getElementById('tokenWarnApp');
+  const warnCrack  = document.getElementById('tokenWarnCrack');
 
   if(SESSION.role === 'reseller'){
     const used  = SESSION.token_used  || 0;
@@ -93,16 +99,22 @@ function updateTokenUI(){
 
     warnMod.classList.toggle('hidden', !full);
     warnApp.classList.toggle('hidden', !full);
+    if(warnCrack) warnCrack.classList.toggle('hidden', !full);
     // disable generate buttons if quota full
     document.getElementById('btnGenMod').disabled = full;
     document.getElementById('btnGenAl').disabled  = full;
+    const btnCrack = document.getElementById('btnGenCrack');
+    if(btnCrack) btnCrack.disabled = full;
   } else {
     badge.classList.add('hidden');
     drawerTok.classList.add('hidden');
     warnMod.classList.add('hidden');
     warnApp.classList.add('hidden');
+    if(warnCrack) warnCrack.classList.add('hidden');
     document.getElementById('btnGenMod').disabled = false;
     document.getElementById('btnGenAl').disabled  = false;
+    const btnCrack = document.getElementById('btnGenCrack');
+    if(btnCrack) btnCrack.disabled = false;
   }
 }
 
@@ -131,13 +143,17 @@ function applySession(s){
 
 function doLogout(){
   SESSION = null;
+  CLI_SESSION = null;
   localStorage.removeItem('sa_session');
   panel.classList.add('hidden');
   loginScreen.classList.remove('hidden');
-  if (CLI_SESSION && CLI_SESSION.username) {
-    document.getElementById('loginUser').value = CLI_SESSION.username;
-  } else {
-    document.getElementById('loginUser').value = '';
+  const userInp = document.getElementById('loginUser');
+  if (userInp) {
+    userInp.value = '';
+    userInp.readOnly = false;
+    userInp.style.opacity = '1';
+    userInp.style.cursor = 'text';
+    userInp.title = '';
   }
   document.getElementById('loginPass').value = '';
   closeDrawer();
@@ -148,7 +164,7 @@ function doLogout(){
 let CLI_SESSION = null;
 let CURRENT_DEVICE = null;
 
-// ── PREFILL / SESSION RESTORE ──────────────────────
+// ── PREFILL / AUTO-LOGIN SESSION RESTORE ──────────────────────
 (async function initLogin(){
   try {
     // 1. Ambil identitas hardware unik device saat ini dari local server
@@ -157,22 +173,22 @@ let CURRENT_DEVICE = null;
       CURRENT_DEVICE = await devRes.json();
     }
 
-    // 2. Ambil session aktif dari CLI (jika dijalankan via genacc.py)
+    // 2. Ambil session aktif dari CLI (jika dijalankan via genacc.py di Termux / PC)
     const res = await fetch('/api/session', { cache: 'no-store' });
     if (res.ok) {
       const cli = await res.json();
       if (cli && cli.username) {
         CLI_SESSION = cli;
-        const userInp = document.getElementById('loginUser');
-        const passInp = document.getElementById('loginPass');
-        if (userInp) {
-          userInp.value = cli.username;
-          userInp.readOnly = true; // KUNCI USERNAME: ga bisa sembarangan ganti akun orang lain
-          userInp.style.opacity = '0.85';
-          userInp.style.cursor = 'not-allowed';
-          userInp.title = 'Terkunci pada akun CLI aktif (' + cli.username + ')';
-        }
-        if (passInp) passInp.focus();
+        // AUTO-LOGIN LANGSUNG KE DASHBOARD (User sudah login di Termux CLI)
+        applySession({
+          id:          cli.id,
+          username:    cli.username,
+          role:        cli.role,
+          token_quota: cli.token_quota || 0,
+          token_used:  cli.token_used  || 0,
+        });
+        go('create-mod');
+        toast(`Login otomatis via CLI: ${cli.username}`, 'ok');
         return;
       }
     }
@@ -193,27 +209,56 @@ document.getElementById('eyeBtn').addEventListener('click',()=>{
 document.getElementById('loginUser').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPass').focus();});
 document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('btnLogin').click();});
 
-// LOGIN WITH 2-LAYER DEVICE BINDING VALIDATION
+// LOGIN WITH MULTI-TIER AUTH (API LOCAL FIRST, SUPABASE DIRECT FALLBACK)
 document.getElementById('btnLogin').addEventListener('click', async ()=>{
   const user = document.getElementById('loginUser').value.trim();
   const pass = document.getElementById('loginPass').value;
-  if(!user){toast('Enter username','err');return;}
-  if(!pass){toast('Enter password','err');return;}
-
-  // PROTEKSI LAPIS 1: Wajib sama dengan akun yang aktif di CLI device ini
-  if (CLI_SESSION && CLI_SESSION.username && user.toLowerCase() !== CLI_SESSION.username.toLowerCase()) {
-    toast('Akses Ditolak: Hanya bisa login dengan akun yang aktif di CLI device ini!', 'err');
-    return;
-  }
+  if(!user){toast('Masukkan username','err');return;}
+  if(!pass){toast('Masukkan password','err');return;}
 
   const btn=document.getElementById('btnLogin');
   busy(btn,true);
 
-  // Ambil data user dari Supabase Auth termasuk device_fingerprint
+  // METODE 1: Coba via /api/login (Flask Server Lokal di Termux / PC)
+  try {
+    const apiRes = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass })
+    });
+    if (apiRes.ok) {
+      const resData = await apiRes.json();
+      if (resData.success && resData.user) {
+        busy(btn,false);
+        CLI_SESSION = resData.user;
+        applySession(resData.user);
+        go('create-mod');
+        toast(`Selamat datang, ${resData.user.username}`,'ok');
+        return;
+      }
+    } else {
+      const errData = await apiRes.json().catch(()=>null);
+      if (errData && errData.error) {
+        busy(btn,false);
+        toast(errData.error, 'err');
+        return;
+      }
+    }
+  } catch (_) {
+    // Server local tidak ada atau endpoint tidak merespon, lanjutkan fallback direct Supabase
+  }
+
+  // METODE 2: Direct Supabase Client
+  if (!DB_AUTH) {
+    busy(btn,false);
+    toast('Gagal koneksi server auth. Pastikan internet aktif!','err');
+    return;
+  }
+
   const { data, error } = await DB_AUTH
     .from('users')
     .select('id, username, role, token_quota, token_used, expired_at, device_fingerprint')
-    .eq('username', user)
+    .ilike('username', user)
     .eq('password', pass)
     .maybeSingle();
 
@@ -221,17 +266,17 @@ document.getElementById('btnLogin').addEventListener('click', async ()=>{
 
   if(error){
     console.error('Supabase DB error:', error);
-    toast('Supabase error: ' + (error.message || 'Cannot connect to API'), 'err');
+    toast('Error Supabase: ' + (error.message || 'Gagal koneksi database'), 'err');
     return;
   }
   if(!data){
-    toast('Invalid username or password','err');
+    toast('Username atau password salah!','err');
     return;
   }
 
   // Check account expiry
   if(data.expired_at && new Date(data.expired_at) < new Date()){
-    toast('Your account has expired. Contact admin.','err');
+    toast('Akun sudah kedaluwarsa. Hubungi admin.','err');
     return;
   }
 
@@ -240,14 +285,30 @@ document.getElementById('btnLogin').addEventListener('click', async ()=>{
     const curFp = CURRENT_DEVICE.device_fingerprint;
     const storedFp = data.device_fingerprint;
 
-    // Jika akun sudah terikat dan beda dengan hardware device saat ini -> BLOKIR!
     if (storedFp && storedFp !== curFp) {
-      toast('Akses Ditolak: Akun ini terikat pada device lain!', 'err');
-      console.warn('[SECURITY] Device mismatch: expected', storedFp, 'got', curFp);
-      return;
+      if (data.role === 'admin') {
+        const ok = confirm(`[PERINGATAN ADMIN]\nAkun Admin terdeteksi di device baru!\n\nDevice terdaftar: ${data.device_model || 'Unknown'}\nDevice saat ini: ${CURRENT_DEVICE.device_model || 'Unknown'}\n\nApakah Anda ingin mereset dan mengikat akun Admin ini ke device sekarang?`);
+        if (ok) {
+          await DB_AUTH
+            .from('users')
+            .update({
+              device_fingerprint: curFp,
+              device_model: CURRENT_DEVICE.device_model || null,
+              platform: CURRENT_DEVICE.platform || null,
+              last_login_at: new Date().toISOString()
+            })
+            .eq('id', data.id);
+          toast('Device binding Admin berhasil diperbarui!', 'ok');
+        } else {
+          return;
+        }
+      } else {
+        toast('Akses Ditolak: Akun ini terikat pada device lain!', 'err');
+        console.warn('[SECURITY] Device mismatch: expected', storedFp, 'got', curFp);
+        return;
+      }
     }
 
-    // Jika akun belum pernah di-bind (first login), bind otomatis ke device ini
     if (!storedFp) {
       await DB_AUTH
         .from('users')
@@ -270,16 +331,16 @@ document.getElementById('btnLogin').addEventListener('click', async ()=>{
     token_used:  data.token_used  || 0,
   });
   go('create-mod');
-  toast(`Welcome, ${data.username}`,'ok');
+  toast(`Selamat datang, ${data.username}`,'ok');
 });
 
 document.getElementById('btnLogout').addEventListener('click', doLogout);
 document.getElementById('btnLogoutMob').addEventListener('click', doLogout);
 
 // ── Increment token (reseller only) ───────────────
-async function useToken(){
+async function useToken(count = 1){
   if(!SESSION || SESSION.role !== 'reseller') return true; // admin: always allow
-  const newUsed = (SESSION.token_used || 0) + 1;
+  const newUsed = (SESSION.token_used || 0) + count;
   const { error } = await DB_AUTH
     .from('users')
     .update({ token_used: newUsed })
@@ -410,6 +471,131 @@ document.getElementById('againAl').addEventListener('click',()=>{
 });
 
 // ══════════════════════════════════════════════════
+// GENERATE: CRACK LICENSE (SA-CRACK-[HEX/CUSTOM])
+// ══════════════════════════════════════════════════
+let lastCrack = '';
+let lastCrackKeys = [];
+
+const btnGenCrackEl = document.getElementById('btnGenCrack');
+if (btnGenCrackEl) {
+  btnGenCrackEl.addEventListener('click', async () => {
+    if (!SESSION) { toast('Not logged in', 'err'); return; }
+
+    const countInput = document.getElementById('crackCount');
+    let count = 1;
+    if (countInput && countInput.value.trim() !== '') {
+      count = parseInt(countInput.value.trim(), 10) || 1;
+      if (count < 1) count = 1;
+    }
+
+    if (SESSION.role === 'reseller') {
+      const quota = SESSION.token_quota || 0;
+      const used = SESSION.token_used || 0;
+      if (used + count > quota) {
+        toast(`Token kuota tidak cukup! Butuh ${count}, sisa: ${quota - used}`, 'err');
+        return;
+      }
+    }
+
+    const rawKey = (document.getElementById('crackCustomKey').value || '').trim();
+    const nick = (document.getElementById('crackNick').value || '').trim() || 'VIP Member';
+    const durationDays = parseInt(document.getElementById('crackDuration').value) || 30;
+    const price = durationDays === 3 ? 1000 : durationDays === 7 ? 2000 : durationDays === 30 ? 5000 : 20000;
+
+    busy(btnGenCrackEl, true);
+
+    const records = [];
+    const generatedKeys = [];
+
+    for (let i = 0; i < count; i++) {
+      let hexPart = '';
+      if (rawKey && count === 1) {
+        hexPart = rawKey.toUpperCase();
+      } else if (rawKey) {
+        hexPart = `${rawKey.toUpperCase()}-${genHex(4).toUpperCase()}`;
+      } else {
+        hexPart = genHex(9).toUpperCase();
+      }
+
+      const key = `SA-CRACK-${hexPart}`;
+      generatedKeys.push(key);
+      records.push({
+        license_key: key,
+        duration_days: durationDays,
+        status: 'unused',
+        nickname: count > 1 ? `${nick} #${i + 1}` : nick,
+        note: 'Generated by ' + SESSION.username,
+        price: price
+      });
+    }
+
+    const { error } = await DB_CRACK.from('licenses').insert(records);
+
+    if (error) {
+      busy(btnGenCrackEl, false);
+      toast('Gagal generate: ' + error.message, 'err');
+      return;
+    }
+
+    const ok = await useToken(count);
+    busy(btnGenCrackEl, false);
+    if (!ok) return;
+
+    lastCrackKeys = generatedKeys;
+    lastCrack = generatedKeys[0];
+
+    const singleBox = document.getElementById('resultCrackSingleBox');
+    const batchBox = document.getElementById('resultCrackBatchBox');
+
+    if (count > 1) {
+      if (singleBox) singleBox.classList.add('hidden');
+      if (batchBox) {
+        batchBox.classList.remove('hidden');
+        const countSpan = document.getElementById('resultCrackBatchCount');
+        if (countSpan) countSpan.textContent = count;
+        const area = document.getElementById('resultCrackBatchArea');
+        if (area) area.value = generatedKeys.join('\n');
+      }
+    } else {
+      if (batchBox) batchBox.classList.add('hidden');
+      if (singleBox) {
+        singleBox.classList.remove('hidden');
+        document.getElementById('resultCrackKey').textContent = lastCrack;
+      }
+    }
+
+    document.getElementById('resultCrackExp').textContent = durationDays === 9999 ? 'Lifetime / Permanen' : `${durationDays} Days Active`;
+    document.getElementById('resultCrack').classList.remove('hidden');
+    toast(`Sukses generate ${count} lisensi SA-CRACK!`, 'ok');
+  });
+}
+
+const copyCrackEl = document.getElementById('copyCrack');
+if (copyCrackEl) {
+  copyCrackEl.addEventListener('click', () => clip(lastCrack, 'Crack License key'));
+}
+
+const copyBatchCrackEl = document.getElementById('copyBatchCrack');
+if (copyBatchCrackEl) {
+  copyBatchCrackEl.addEventListener('click', () => {
+    clip(lastCrackKeys.join('\n'), `${lastCrackKeys.length} License keys`);
+  });
+}
+
+const againCrackEl = document.getElementById('againCrack');
+if (againCrackEl) {
+  againCrackEl.addEventListener('click', () => {
+    document.getElementById('resultCrack').classList.add('hidden');
+    document.getElementById('crackCustomKey').value = '';
+    document.getElementById('crackNick').value = '';
+    const countInput = document.getElementById('crackCount');
+    if (countInput) countInput.value = '';
+    lastCrack = '';
+    lastCrackKeys = [];
+  });
+}
+
+// ══════════════════════════════════════════════════
 // INVENTORY — role-based filter
 // ══════════════════════════════════════════════════
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
@@ -417,21 +603,43 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');document.getElementById(t.dataset.tab).classList.add('active');
 }));
-document.getElementById('btnRefresh').addEventListener('click',loadInventory);
+let STORAGE_MODE = 'private';
+
+const storageSelectEl = document.getElementById('storageScopeSelect');
+if (storageSelectEl) {
+  storageSelectEl.addEventListener('change', (e) => {
+    STORAGE_MODE = e.target.value;
+    loadInventory();
+  });
+}
 
 function loadInventory(){
   const desc=document.getElementById('invDesc');
+  const wrap=document.getElementById('storageFilterWrap');
   if(SESSION){
-    desc.innerHTML=SESSION.role==='admin'
-      ?'Viewing <strong>all records</strong> (admin access)'
-      :`Viewing records created by <strong>${SESSION.username}</strong>`;
+    if(SESSION.role === 'admin' && wrap){
+      wrap.style.display = 'block';
+    } else if(wrap){
+      wrap.style.display = 'none';
+    }
+
+    if(SESSION.role === 'admin' && STORAGE_MODE === 'all'){
+      desc.innerHTML = '<i class="fa-solid fa-globe"></i> Master Admin View: Melihat <strong>semua storage/inventory</strong>';
+    } else {
+      desc.innerHTML = `<i class="fa-solid fa-lock"></i> Private Storage: <strong>${SESSION.username}</strong> (Penyimpanan modul & lisensi terisolasi)`;
+    }
   }
-  fetchMod();fetchApp();
+  fetchMod();fetchApp();fetchCrack();
 }
 
 function buildQuery(table){
   let q=DB.from(table).select('*').order('created_at',{ascending:false});
-  if(SESSION && SESSION.role==='reseller') q=q.eq('created_by',SESSION.username);
+  // Setiap user / reseller / admin memiliki storage mereka sendiri
+  if(SESSION){
+    if(SESSION.role !== 'admin' || STORAGE_MODE === 'private'){
+      q=q.eq('created_by', SESSION.username);
+    }
+  }
   return q;
 }
 
@@ -592,11 +800,98 @@ document.getElementById('btnConfirmDel').addEventListener('click', async ()=>{
   const {id,type}=pend;if(!id)return;
   const btn=document.getElementById('btnConfirmDel');
   busy(btn,true);
-  const {error}=await DB.from(type==='mod'?'module_licenses':'app_accounts').delete().eq('id',id);
+  let err = null;
+  if (type === 'crack') {
+    const res = await DB_CRACK.from('licenses').delete().eq('id', id);
+    err = res.error;
+  } else {
+    const res = await DB.from(type==='mod'?'module_licenses':'app_accounts').delete().eq('id',id);
+    err = res.error;
+  }
   busy(btn,false);
-  if(error){toast(error.message,'err');return;}
+  if(err){toast(err.message,'err');return;}
   toast('Record deleted','ok');closeModal('modalConfirm');
   pend={id:null,type:null};
-  type==='mod'?fetchMod():fetchApp();
+  if(type==='mod') fetchMod();
+  else if(type==='app') fetchApp();
+  else fetchCrack();
 });
+
+// ── FETCH CRACK LICENSES (1-DEVICE HWID) ──────────
+async function fetchCrack(){
+  const ldD=document.getElementById('ldCrackD'),tbD=document.getElementById('tbodyCrackD'),
+        tD=document.getElementById('tblCrackD'),emD=document.getElementById('emCrackD'),
+        ldM=document.getElementById('ldCrackM'),cM=document.getElementById('cardsCrackM'),
+        emM=document.getElementById('emCrackM');
+  if(!tbD) return;
+
+  ldD.style.display='flex';tD.style.display='none';emD.classList.add('hidden');
+  ldM.style.display='flex';ldM.classList.remove('hidden');cM.innerHTML='';emM.classList.add('hidden');
+
+  let query = DB_CRACK.from('licenses').select('*').order('id', { ascending: false });
+  if(SESSION){
+    if(SESSION.role !== 'admin' || STORAGE_MODE === 'private'){
+      query = query.ilike('note', `%${SESSION.username}%`);
+    }
+  }
+  const { data, error } = await query;
+
+  ldD.style.display='none';ldM.style.display='none';ldM.classList.add('hidden');
+  if(error){toast(error.message,'err');return;}
+  if(!data||!data.length){emD.classList.remove('hidden');tbD.innerHTML='';emM.classList.remove('hidden');return;}
+
+  tD.style.display='';
+  tbD.innerHTML = data.map((r, i) => `
+    <tr>
+      <td class="td-num">${i+1}</td>
+      <td class="td-mono" style="font-weight:700; color:#ff8c00;" title="${r.license_key}">${r.license_key}</td>
+      <td><strong>${r.nickname || '—'}</strong></td>
+      <td class="td-dim">${r.duration_days === 9999 ? 'Lifetime' : r.duration_days + ' Days'}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.hwid || 'Unbound (Ready)'}">
+        ${r.hwid ? `<span style="color:#22c55e;">[LOCKED] ${r.hwid.slice(0, 16)}...</span>` : '<span style="color:#888;">[Belum Bind]</span>'}
+      </td>
+      <td>${sbadge(r.status || 'unused')}</td>
+      <td class="td-dim">${fmt(r.created_at)}</td>
+      <td><div class="row-acts">
+        ${r.hwid ? `<button class="tbl-btn edit reset-hwid" data-id="${r.id}" title="Reset HWID jika pembeli ganti HP"><i class="fa-solid fa-arrows-rotate"></i> Reset HWID</button>` : ''}
+        <button class="tbl-btn del" data-id="${r.id}"><i class="fa-regular fa-trash-can"></i></button>
+      </div></td>
+    </tr>`).join('');
+
+  tbD.querySelectorAll('.reset-hwid').forEach(b => b.addEventListener('click', async () => {
+    if(!confirm('Reset HWID untuk lisensi ini? HWID akan dikosongkan dan siap dipakai di HP baru.')) return;
+    busy(b, true);
+    const { error } = await DB_CRACK.from('licenses').update({ hwid: null, status: 'unused' }).eq('id', b.dataset.id);
+    busy(b, false);
+    if(error){ toast(error.message, 'err'); return; }
+    toast('HWID berhasil di-reset!', 'ok');
+    fetchCrack();
+  }));
+  tbD.querySelectorAll('.tbl-btn.del').forEach(b=>b.addEventListener('click',()=>askDel(b.dataset.id,'crack')));
+
+  cM.innerHTML = data.map(r => `
+    <div class="rec-card">
+      <div class="rec-head"><span class="rec-key" style="color:#ff8c00;" title="${r.license_key}">${r.license_key}</span>${sbadge(r.status || 'unused')}</div>
+      <div class="rec-body">
+        <div class="rec-f"><span class="rec-lab">Nickname</span><span class="rec-val"><strong>${r.nickname || '—'}</strong></span></div>
+        <div class="rec-f"><span class="rec-lab">Duration</span><span class="rec-val">${r.duration_days === 9999 ? 'Lifetime' : r.duration_days + ' Days'}</span></div>
+        <div class="rec-f"><span class="rec-lab">HWID</span><span class="rec-val" style="font-family:'JetBrains Mono',monospace;font-size:11px">${r.hwid ? r.hwid.slice(0, 16) + '...' : 'Belum Bind'}</span></div>
+        <div class="rec-f"><span class="rec-lab">Created At</span><span class="rec-val">${fmt(r.created_at)}</span></div>
+      </div>
+      <div class="rec-foot">
+        ${r.hwid ? `<button class="rec-btn edit reset-hwid" data-id="${r.id}"><i class="fa-solid fa-arrows-rotate"></i> Reset HWID</button>` : ''}
+        <button class="rec-btn del" data-id="${r.id}"><i class="fa-regular fa-trash-can"></i> Delete</button>
+      </div>
+    </div>`).join('');
+
+  cM.querySelectorAll('.reset-hwid').forEach(b => b.addEventListener('click', async () => {
+    if(!confirm('Reset HWID untuk lisensi ini?')) return;
+    const { error } = await DB_CRACK.from('licenses').update({ hwid: null, status: 'unused' }).eq('id', b.dataset.id);
+    if(error){ toast(error.message, 'err'); return; }
+    toast('HWID berhasil di-reset!', 'ok');
+    fetchCrack();
+  }));
+  cM.querySelectorAll('.rec-btn.del').forEach(b=>b.addEventListener('click',()=>askDel(b.dataset.id,'crack')));
+}
+
 

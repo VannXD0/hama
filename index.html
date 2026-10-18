@@ -67,6 +67,9 @@
         <button class="nav-btn" data-page="create-app-lic">
           <i class="fa-solid fa-mobile-screen"></i><span>App License</span>
         </button>
+        <button class="nav-btn" data-page="create-crack-lic">
+          <i class="fa-solid fa-shield-halved"></i><span>Crack License</span>
+        </button>
         <button class="nav-btn" data-page="inventory">
           <i class="fa-solid fa-table-list"></i><span>Inventory</span>
         </button>
@@ -117,6 +120,11 @@
         <button class="mob-item" data-page="create-app-lic">
           <i class="fa-solid fa-mobile-screen"></i>
           <div class="mob-item-text"><span class="mob-main">App License</span><span class="mob-sub">Generate SAS-VIP-APP</span></div>
+          <i class="fa-solid fa-chevron-right mob-arr"></i>
+        </button>
+        <button class="mob-item" data-page="create-crack-lic">
+          <i class="fa-solid fa-shield-halved"></i>
+          <div class="mob-item-text"><span class="mob-main">Crack License</span><span class="mob-sub">Generate SA-CRACK</span></div>
           <i class="fa-solid fa-chevron-right mob-arr"></i>
         </button>
         <button class="mob-item" data-page="inventory">
@@ -265,6 +273,80 @@
         </div>
       </section>
 
+      <!-- PAGE: CRACK LICENSE -->
+      <section class="page" id="page-create-crack-lic">
+        <div class="page-head">
+          <div class="page-tag"><i class="fa-solid fa-shield-halved"></i> 1-DEVICE CRACK LICENSE</div>
+          <h1 class="page-title">Crack License</h1>
+          <p class="page-desc">Generate SA-CRACK license key with strict 1-device HWID lock.</p>
+        </div>
+
+        <div class="token-warn hidden" id="tokenWarnCrack">
+          <i class="fa-solid fa-circle-xmark"></i>
+          <span>Token quota reached. Contact admin to increase your limit.</span>
+        </div>
+
+        <div class="form-card">
+          <div class="form-body">
+            <div class="sec-label">Configuration</div>
+            <div class="field">
+              <label class="flabel">Custom Key / Hex <span class="opt">optional — random 9-hex if blank</span></label>
+              <input type="text" id="crackCustomKey" class="finput" placeholder="e.g. VIP999 (Format: SA-CRACK-[KEY])" maxlength="32"/>
+            </div>
+            <div class="field">
+              <label class="flabel">Nickname / Buyer Name <span class="opt">optional</span></label>
+              <input type="text" id="crackNick" class="finput" placeholder="e.g. Sultan_Buyer"/>
+            </div>
+            <div class="field">
+              <label class="flabel">Jumlah Key / Count <span class="opt">kosongkan untuk 1 key normal</span></label>
+              <input type="number" id="crackCount" class="finput" min="1" max="500" placeholder="1"/>
+            </div>
+            <div class="field">
+              <label class="flabel">Duration</label>
+              <div class="sel-wrap">
+                <select id="crackDuration" class="fselect">
+                  <option value="3">3 Days (Paket 3 Hari)</option>
+                  <option value="7">7 Days (Paket 7 Hari)</option>
+                  <option value="30" selected>30 Days (Paket 30 Hari)</option>
+                  <option value="9999">Lifetime / Permanent</option>
+                </select>
+                <i class="fa-solid fa-chevron-down sel-arr"></i>
+              </div>
+            </div>
+            <button class="btn-gen" id="btnGenCrack">
+              <i class="fa-solid fa-bolt"></i> Generate Crack License
+            </button>
+          </div>
+
+          <div class="result hidden" id="resultCrack">
+            <div class="result-sep"><span>Generated</span></div>
+            <div class="keybox" id="resultCrackSingleBox">
+              <div class="keybox-label"><i class="fa-solid fa-key"></i> License Key</div>
+              <div class="keybox-row">
+                <code class="keyval" id="resultCrackKey"></code>
+                <button class="copy-btn" id="copyCrack"><i class="fa-regular fa-copy"></i></button>
+              </div>
+            </div>
+            <div class="keybox hidden" id="resultCrackBatchBox">
+              <div class="keybox-label"><i class="fa-solid fa-layer-group"></i> List License Keys (<span id="resultCrackBatchCount"></span> key)</div>
+              <textarea id="resultCrackBatchArea" class="finput" rows="6" readonly style="font-family:monospace; font-size:12px; margin-top:6px; width:100%; box-sizing:border-box;"></textarea>
+              <div style="margin-top:8px;">
+                <button class="copy-btn" id="copyBatchCrack" style="width:100%; justify-content:center; padding:8px; height:auto;">
+                  <i class="fa-regular fa-copy"></i> Copy Semua Key
+                </button>
+              </div>
+            </div>
+            <div class="chips">
+              <div class="chip"><i class="fa-regular fa-clock"></i><span id="resultCrackExp"></span></div>
+              <div class="chip chip-g"><i class="fa-solid fa-circle" style="font-size:5px"></i> unused / ready</div>
+            </div>
+            <button class="btn-again" id="againCrack">
+              <i class="fa-solid fa-rotate-right"></i> Generate Again
+            </button>
+          </div>
+        </div>
+      </section>
+
       <!-- PAGE: INVENTORY -->
       <section class="page" id="page-inventory">
         <div class="page-head inv-head">
@@ -272,6 +354,13 @@
             <div class="page-tag"><i class="fa-solid fa-database"></i> INVENTORY</div>
             <h1 class="page-title">Inventory</h1>
             <p class="page-desc" id="invDesc">Loading...</p>
+            <div class="storage-selector-wrap" id="storageFilterWrap" style="display:none; margin-top:8px;">
+              <span style="font-size:12px; color:var(--txt2); margin-right:8px;"><i class="fa-solid fa-box-archive"></i> Mode Storage:</span>
+              <select id="storageScopeSelect" class="finput" style="width:auto; padding:5px 12px; font-size:12px; display:inline-block; border-color:var(--border);">
+                <option value="private" selected>Storage Pribadi (Hanya Milik Saya)</option>
+                <option value="all">Semua Storage (Master Admin)</option>
+              </select>
+            </div>
           </div>
           <button class="btn-refresh" id="btnRefresh">
             <i class="fa-solid fa-arrows-rotate"></i><span>Refresh</span>
@@ -281,6 +370,7 @@
         <div class="tab-bar">
           <button class="tab active" data-tab="tabModule"><i class="fa-solid fa-key"></i> Module</button>
           <button class="tab" data-tab="tabApp"><i class="fa-solid fa-mobile-screen"></i> App</button>
+          <button class="tab" data-tab="tabCrack"><i class="fa-solid fa-shield-halved"></i> Crack</button>
         </div>
 
         <div class="tab-panel active" id="tabModule">
@@ -320,9 +410,46 @@
           <div class="tbl-state hidden m-only" id="ldAppM"><div class="spin"></div><span>Loading...</span></div>
           <div class="tbl-empty hidden m-only" id="emAppM"><i class="fa-solid fa-inbox"></i> No records found</div>
         </div>
-      </section>
 
+        <div class="tab-panel" id="tabCrack">
+          <div class="tbl-card d-only">
+            <div class="tbl-state" id="ldCrackD"><div class="spin"></div><span>Loading...</span></div>
+            <div class="tbl-scroll">
+              <table class="tbl" id="tblCrackD">
+                <thead><tr>
+                  <th>#</th><th>License Key</th><th>Nickname</th><th>Duration</th>
+                  <th>Machine HWID</th><th>Status</th><th>Created At</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="tbodyCrackD"></tbody>
+              </table>
+            </div>
+            <div class="tbl-empty hidden" id="emCrackD"><i class="fa-solid fa-inbox"></i> No records found</div>
+          </div>
+          <div class="card-list m-only" id="cardsCrackM"></div>
+          <div class="tbl-state hidden m-only" id="ldCrackM"><div class="spin"></div><span>Loading...</span></div>
+          <div class="tbl-empty hidden m-only" id="emCrackM"><i class="fa-solid fa-inbox"></i> No records found</div>
+        </div>
     </main>
+
+    <!-- MOBILE BOTTOM NAVIGATION BAR -->
+    <nav class="bottom-nav">
+      <button class="bnav-btn active" data-page="create-mod">
+        <i class="fa-solid fa-key"></i>
+        <span>Module</span>
+      </button>
+      <button class="bnav-btn" data-page="create-app-lic">
+        <i class="fa-solid fa-mobile-screen"></i>
+        <span>App</span>
+      </button>
+      <button class="bnav-btn" data-page="create-crack-lic">
+        <i class="fa-solid fa-shield-halved"></i>
+        <span>Crack HWID</span>
+      </button>
+      <button class="bnav-btn" data-page="inventory">
+        <i class="fa-solid fa-table-list"></i>
+        <span>Inventory</span>
+      </button>
+    </nav>
   </div><!-- /panel -->
 
   <!-- MODAL: EDIT MODULE -->
@@ -396,7 +523,12 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script>
+    if (typeof window.supabase === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/script>');
+    }
+  </script>
   <script src="script.js"></script>
 </body>
 </html>
