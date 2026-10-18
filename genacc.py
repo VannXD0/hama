@@ -67,7 +67,7 @@ CRACK_KEY = (
     "kkNJHhMYk2s5Nfonj3EOMixi7XQ4VU_U0zekhCkHBlk"
 )
 
-GITHUB_RAW = "https://raw.githubusercontent.com/Xyr0Dev/hama/main"
+GITHUB_RAW = "https://raw.githubusercontent.com/VannXD0/hama/main"
 PORT = 5000
 
 CACHE = {}
@@ -498,14 +498,16 @@ def fetch_github(filename):
         if time.time() - cached_time < CACHE_DURATION:
             return cached_content
     
-    try:
-        r = requests.get(f"{GITHUB_RAW}/{filename}", timeout=10)
-        if r.status_code == 200:
-            CACHE[filename] = (time.time(), r.text)
-            return r.text
-        return f"Error: File {filename} tidak ditemukan di repository GitHub."
-    except Exception as e:
-        return f"Error: {str(e)}"
+    # Try primary repository (VannXD0/hama) then fallback
+    for repo_base in [GITHUB_RAW, "https://raw.githubusercontent.com/Xyr0Dev/hama/main"]:
+        try:
+            r = requests.get(f"{repo_base}/{filename}", timeout=10)
+            if r.status_code == 200:
+                CACHE[filename] = (time.time(), r.text)
+                return r.text
+        except Exception:
+            continue
+    return f"Error: File {filename} tidak ditemukan di repository GitHub."
 
 
 # ── Local asset path (same folder as genacc.py) ──
@@ -526,10 +528,10 @@ def ensure_web_assets():
     tersedia secara lokal di folder genacc.py agar tidak tergantung koneksi GitHub & anti-404.
     """
     files_to_check = {
-        "script.js": "https://raw.githubusercontent.com/Xyr0Dev/hama/main/script.js",
-        "index.html": "https://raw.githubusercontent.com/Xyr0Dev/hama/main/index.html",
-        "style.css": "https://raw.githubusercontent.com/Xyr0Dev/hama/main/style.css",
-        "supabase.js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8/dist/umd/supabase.min.js"
+        "script.js": "https://raw.githubusercontent.com/VannXD0/hama/main/script.js",
+        "index.html": "https://raw.githubusercontent.com/VannXD0/hama/main/index.html",
+        "style.css": "https://raw.githubusercontent.com/VannXD0/hama/main/style.css",
+        "supabase.js": "https://raw.githubusercontent.com/VannXD0/hama/main/supabase.js"
     }
 
     for fn, url in files_to_check.items():
@@ -542,7 +544,23 @@ def ensure_web_assets():
             try:
                 with open(local_path, "r", encoding="utf-8") as f:
                     content = f.read()
-                    if "ljjzgddqbwpervtablgj" in content:
+                    if "ljjzgddqbwpervtablgj" in content or "crackCustomKey" not in content:
+                        needs_download = True
+            except Exception:
+                needs_download = True
+        elif fn == "index.html":
+            try:
+                with open(local_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if "create-crack-lic" not in content or "bottom-nav" not in content:
+                        needs_download = True
+            except Exception:
+                needs_download = True
+        elif fn == "style.css":
+            try:
+                with open(local_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if "bottom-nav" not in content:
                         needs_download = True
             except Exception:
                 needs_download = True
@@ -556,13 +574,6 @@ def ensure_web_assets():
                         text = text.replace("https://ljjzgddqbwpervtablgj.supabase.co", "https://wleslngeddeshlbgwayn.supabase.co")
                         text = text.replace("ljjzgddqbwpervtablgj", "wleslngeddeshlbgwayn")
                         text = text.replace("4FDByk8iEv3RWpx6t2dj7sgLn3DUqL3HQh-tvX0LPss", "9p_9WY6ZO73yVhMO4JF0FQVgdkDw2U7pZAKW0Ugy5B4")
-                        if "applySession(cli);" not in text:
-                            text = text.replace("if (passInp) passInp.focus();", "applySession(cli);")
-                    elif fn == "index.html":
-                        if "supabase.js" not in text:
-                            text = text.replace("</body>", '<script src="supabase.js"></script>\n<script src="script.js?v=termux_auto"></script>\n</body>')
-                        else:
-                            text = text.replace('src="script.js"', 'src="script.js?v=termux_auto"')
                     with open(local_path, "w", encoding="utf-8") as f:
                         f.write(text)
             except Exception:
